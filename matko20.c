@@ -38,10 +38,10 @@ typedef struct dfile {
 #define TRUE 1
 #define FALSE 0
 
-void iterate_dict(PyObject*, DFILE*);
+void iterate_dict(PyObject*, DFILE*,int*);
 void alloc_properties(DFILE *, PyObject *);
 const char* get_py_string(PyObject*);
-void print_fs(DFILE *, int);
+void print_fs(DFILE *, int,char*);
 
 typedef int (*fuse_fill_dir_t) (void *buf, const char *name, const struct stat *sbuft, off_t off); 
 
@@ -242,6 +242,7 @@ int main(int argc, char *argv[]) {
 	PyRun_SimpleString(
 		"import sys\n"
 		"sys.path.append('/home/pi/Documents/C/matko')\n"
+		"sys.path.append('/home/matko/Desktop/cuddly-fs')\n"
 	);
 	
 	sysPath = PySys_GetObject("path");
@@ -310,10 +311,15 @@ int main(int argc, char *argv[]) {
 	printf("---- ZACINAM VYPISOVANIE V C ----\n");
 	//allocate dirs char array
 	dirs=(char**)malloc(dirs_count * sizeof(char*));
+	dirs[dir_index]=strdup("/");
+	dir_index++;
 	//for(i=0;i<dirs_count;i++) dirs[i]=
 	char *curdir=malloc(2*sizeof(char));
-	strcat(curdir,"/");
+	curdir[0]='\0';
+	//strcat(curdir,"/");
 	print_fs(root,0,curdir);
+	printf("----- VYPIS DIRS -------\n");
+	for(i=0;i<dirs_count;i++) printf("%s\n", dirs[i]);
 	Py_DECREF(sLong);
 	Py_DECREF(files);
 	Py_DECREF(sValue);
@@ -362,7 +368,7 @@ void iterate_dict(PyObject *sValue, DFILE *root,int *dirs_count) {
 			++(*dirs_count);
 			PyObject *files = PyDict_GetItemString(value, "files");
 			//Py_INCREF(files);
-			iterate_dict(files,cur);
+			iterate_dict(files,cur,dirs_count);
 			//Py_DECREF(files);
 		}
 	}
@@ -412,8 +418,7 @@ void print_fs(DFILE *root, int depth, char *current_dir)
 	DFILE *cur;
 	cur=root->first_child;
 	char *next_dir=NULL;
-	dirs[dir_index]=current_dir;
-	dir_index++;
+
 	while(cur!=NULL)
 	{
 		for(i=0;i<depth;i++) printf("\t");
@@ -422,9 +427,13 @@ void print_fs(DFILE *root, int depth, char *current_dir)
 			printf("%s/\n",cur->name);
 			int alloc_size = strlen(current_dir) + strlen(cur->name) + 2;
 			next_dir=(char*)malloc(alloc_size*sizeof(char));
+			next_dir[0]='\0';
+			printf("Pre %s \n som alokoval %d miesta!, curdir: %d , curname: %d\n", cur->name, alloc_size, strlen(current_dir), strlen(cur->name));
 			strcat(next_dir,current_dir);
-			strcat(next_dir,cur->name);
 			strcat(next_dir,"/");
+			strcat(next_dir,cur->name);
+			dirs[dir_index]=next_dir;
+			dir_index++;
 			print_fs(cur,depth+1,next_dir);	
 		}
 		else

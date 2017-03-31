@@ -1,1 +1,5 @@
-hue
+
+
+Prikaz na buildovanie:
+
+gcc -Wall -I/usr/include/python3.4m -lpython3.4m matko20.c -o fs `pkg-config fuse3 --cflags --libs`
