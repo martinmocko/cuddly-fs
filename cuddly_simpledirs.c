@@ -95,6 +95,51 @@ static int fsgetattr(const char *path, struct stat *st) {
 	return 0;
 	}
 	
+	
+//najde spravny subor/adresar podla path	
+DFILE *find_file(char *path)	 {
+	//tuto vzdy bude treba posielat konvertovane path z const char * na char*
+	//cize asi sa to bude riesit cez strdup, treba si davat pozor na to ze treba
+	//dealokovat pointre
+	DFILE *cur=root->first_child;
+	char found=FALSE;
+	const char s[2] = "/";
+	char *token;
+	/* get the first token */
+	token = strtok(path, s);
+	/* walk through other tokens */
+	while( token != NULL ) 
+	{
+		found=FALSE;
+       //printf( " %s\n", token );
+		while(cur!=NULL) 
+		{
+			if(strcmp(cur->name, token) != 0) 
+			{
+				cur=cur->next_sibling;
+			}
+			else
+			{
+				found=TRUE;
+				break;
+			}
+		}
+		if (found) {
+			token = strtok(NULL, s);
+			if(token != NULL)
+				cur=cur->first_child;
+			else
+				; //v smerniku cur je teraz spravny najdeny node
+		}
+		else
+		{
+			cur=NULL;
+			break;
+		}
+	}
+	return cur;
+}
+
 void fill_dir(const char *path, void *buffer, fuse_fill_dir_t filler) {
 	DFILE *cur=NULL;
 	//najdeme si spravny directory
@@ -112,38 +157,12 @@ void fill_dir(const char *path, void *buffer, fuse_fill_dir_t filler) {
 	}
 	else 
 	{
-		//musime najst spravny adresar na vypisanie
-		const char s[2] = "/";
-		char *token;
-		/* get the first token */
-		token = strtok(path2, s);
-		/* walk through other tokens */
-		
-		while( token != NULL ) 
-		{
-			found=FALSE;
-        //printf( " %s\n", token );
-		while(cur!=NULL) 
-			{
-				if(strcmp(cur->name, token) != 0) 
-				{
-					cur=cur->next_sibling;
-				}
-				else
-				{
-					found=TRUE;
-					cur=cur->first_child;
-					break;
-				}
-			}
-		if (found)
-			token = strtok(NULL, s);
-		else
-		{
-			break;
-		}
-		
-		}
+	cur=find_file(path2);
+	if(cur != NULL) {
+	found=TRUE; //nasli sme priecinok, teraz zoberieme z neho prvy child
+	cur=cur->first_child;
+	}
+	
 	if(found) //TODO: DOIMPLEMENTOVAT NEJAKE ROZUMNE RIESENIE NENAJDENIA SPRAVNEHO ADRESARA
 	while(cur)
 	{
