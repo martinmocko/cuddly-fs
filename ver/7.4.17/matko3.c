@@ -371,8 +371,12 @@ static int fsread(const char *path, char *buffer, size_t size, off_t offset, str
 	//free(filecontent);
 	if(out)
 	{
+	int dlzka = strlen(out) - offset;
 	memcpy(buffer, out + offset, size);
-	return strlen(out) - offset;
+	free(out);
+	return dlzka;
+	//return strlen(out) - offset;
+	//return 100;
 	}
 	
 	else { return 0; }
@@ -427,6 +431,7 @@ int main(int argc, char *argv[]) {
 		"import sys\n"
 		"sys.path.append('/home/pi/Documents/C/matko')\n"
 		"sys.path.append('/home/matko/Desktop/cuddly-fs')\n"
+		"sys.path.append('/home/matko/Desktop/cuddly-fs/ver/7.4.17')\n"
 	);
 	
 	sysPath = PySys_GetObject("path");

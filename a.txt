@@ -3,3 +3,18 @@
 Prikaz na buildovanie:
 
 gcc -Wall -I/usr/include/python3.4m -lpython3.4m matko20.c -o fs `pkg-config fuse3 --cflags --libs`
+
+latest (bez libcurl):
+gcc -Wall -I/usr/include/python3.4m -lpython3.4m cuddly_simpledirs.c -o fs `pkg-config fuse --cflags --libs`
+
+latest (s libcurl):
+gcc -Wall -I/usr/include/python3.4m -lpython3.4m cuddly_simpledirs.c -o fs `pkg-config fuse --cflags --libs` -lcurl
+
+mount filesystem:
+./fs matulko
+
+unmount filesystem:
+fusermount -u matulko
+
+iba pre lcurl:
+gcc -Wall crl.c -o crl -lcurl
