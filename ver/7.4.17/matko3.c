@@ -64,7 +64,7 @@ char **dirs=NULL;
 int dir_index=0;
 
 static int fsgetattr(const char *path, struct stat *st) {
-	
+	memset(st,0,sizeof(struct stat));
 	//experimental coding by pinky the little pornstar
 	
 	
@@ -106,7 +106,28 @@ static int fsgetattr(const char *path, struct stat *st) {
 		{
 			st->st_atime = get_atime(node->date, node->time);
 			st->st_mtime = get_mtime(node->date, node->time);
-			st->st_size = node->size;
+			st->st_size = 20000;
+			if (strcmp(path,"/file1.txt") == 0) {
+				printf("ANO PATH JE %s\n", path);
+				fflush(stdout);
+				st->st_size = (size_t)10000;
+				}
+			if (strcmp(path,"/style.css")  == 0) {
+				printf("ANO PATH JE %s\n", path);
+				fflush(stdout);
+				st->st_size = (size_t)181;
+				}
+		}
+		else  
+		{
+			/* tento else znamena ze sa nasli subory v nasom file systeme take ktore nie su
+			* na webstranke -- cize tajne subory ako napriklad .xdg-volume-info
+			* v pripade takychto suborov je nutne nejakym sposobom zistit ich velkost aby sa
+			* mohli spravne osetrit, a nastavit spravna velkost, aby nepadali dalsie funkcie fusu
+			*/
+			 //docasny workaround
+			 st->st_size = 20000; //skusit nastavit size na nejaku dostatocne velku natvrdo
+			 //hope for the best
 		}
 		st->st_mode = S_IFREG | 0644;
 		st->st_nlink = 1;
@@ -286,6 +307,7 @@ void fill_dir(const char *path, void *buffer, fuse_fill_dir_t filler) {
 static int fsreaddir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *FI) {
 	
 	printf("vypisujem subory v adresari %s/n", path);
+	fflush(stdout);
 	
 	filler(buffer, ".", NULL, 0);
 	filler(buffer, "..", NULL, 0);
@@ -361,7 +383,7 @@ static int fsread(const char *path, char *buffer, size_t size, off_t offset, str
 	else if (strcmp(path,"/hello") == 0) {
 		out = hello_cont;		
 		}
-	else {
+	else if (find_file(strdup(path))) {
 		
 		struct string filecontent = get_file_content(path);		
 		out = filecontent.ptr;
@@ -372,7 +394,8 @@ static int fsread(const char *path, char *buffer, size_t size, off_t offset, str
 	if(out)
 	{
 	int dlzka = strlen(out) - offset;
-	memcpy(buffer, out + offset, size);
+	memcpy(buffer, out + offset, dlzka +1 );
+	printf("Dlzka pre path: %s \nje %d a size je %d offset je %d\n", path,dlzka, (int)size, (int)offset);
 	free(out);
 	return dlzka;
 	//return strlen(out) - offset;
