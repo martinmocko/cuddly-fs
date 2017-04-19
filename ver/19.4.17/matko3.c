@@ -450,6 +450,7 @@ int main(int argc, char *argv[]) {
 		"import sys\n"
 		"sys.path.append('/home/pi/Documents/C/matko')\n"
 		"sys.path.append('/home/matko/Desktop/cuddly-fs')\n"
+		"sys.path.append('/home/matko/Desktop/cuddly-fs/ver/19.4.17')\n"
 	);
 	
 	sysPath = PySys_GetObject("path");
@@ -465,7 +466,7 @@ int main(int argc, char *argv[]) {
 	}
 	
 	int kind = PyUnicode_1BYTE_KIND;
-	sName=PyUnicode_FromKindAndData(kind, filename, (Py_ssize_t) 5);
+	sName=PyUnicode_FromKindAndData(kind, filename, (Py_ssize_t) strlen(filename));
 	sModule = PyImport_Import(sName);
 	Py_DECREF(sName);
 	
