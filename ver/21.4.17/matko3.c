@@ -58,7 +58,7 @@ void print_fs(DFILE *, int,char*);
 DFILE *find_file(char *);
 time_t get_atime(const char *, const char *);
 time_t get_mtime(const char *,const char *);
-void call_parser();
+void call_parser(char *, char* , int);
 
 typedef int (*fuse_fill_dir_t) (void *buf, const char *name, const struct stat *sbuft, off_t off); 
 
@@ -93,13 +93,15 @@ static int fsgetattr(const char *path, struct stat *st) {
 	
 	if(strcmp(path,"/") != 0) {
 		printf("HLADAM FSGETATTR PRE %s \n", path);
-		
+		/*
 		if(strcmp(mode, "R") == 0)
 		{
 			int index = find_last_slash(temp_path);
 			int i;
 			for(i=0;i<index;i++) temp_path++;
 		}
+		* */
+		
 		node = find_file(temp_path);
 		if(node)
 		printf("NASIEL SOM NODE %s \n", node->name);
@@ -131,9 +133,15 @@ static int fsgetattr(const char *path, struct stat *st) {
 		printf("DIR\n");
 		st->st_uid = getuid();
 		st->st_gid = getgid();
+		printf("Tu-1\n");
+		if((node->date != NULL) && (node->time != NULL)) {
 		st->st_atime = get_atime(node->date, node->time);
+		}
+		if((node->date != NULL) && (node->time != NULL)) {
 		st->st_mtime = get_mtime(node->date, node->time);
+		}
 		st->st_mode = S_IFDIR | 0444; //0755;
+		printf("Tu-4\n");
 		st->st_nlink = 2;
 		st->st_size = 4096;	
 		}	
@@ -224,6 +232,8 @@ DFILE *find_file(char *path)	 {
 	//tuto vzdy bude treba posielat konvertovane path z const char * na char*
 	//cize asi sa to bude riesit cez strdup, treba si davat pozor na to ze treba
 	//dealokovat pointre
+	if(strcmp(path, "/") == 0 )
+	{ return root; }
 	DFILE *cur=root->first_child;
 	char found=FALSE;
 	const char s[2] = "/";
@@ -231,6 +241,8 @@ DFILE *find_file(char *path)	 {
 	/* get the first token */
 	token = strtok(path, s);
 	/* walk through other tokens */
+	printf("Volany find_file s path: %s\n", path);
+	
 	while( token != NULL ) 
 	{
 		found=FALSE;
@@ -256,7 +268,15 @@ DFILE *find_file(char *path)	 {
 		}
 		else
 		{
+			if(strcmp(root->name, token) == 0)
+			{
+				cur=root;
+			}
+			else 
+			{
 			cur=NULL;
+			}
+			
 			break;
 		}
 	}
@@ -318,9 +338,10 @@ char *create_url(char *path)
 
 void dealloc_DFILE(DFILE* node) 
 {
+	printf("CALLING DEALLOC\n");
 	DFILE* child = node->first_child;
 	DFILE* next = NULL;
-	if(child != NULL)
+	while(child != NULL)
 	{
 		next=child->next_sibling;
 		free((char*)child->name);
@@ -329,40 +350,59 @@ void dealloc_DFILE(DFILE* node)
 		free(child);
 		child=next;
 	}
-	free(node);
+	node->first_child = NULL;
 }
 
 void fill_dir_R(const char *path, void *buffer, fuse_fill_dir_t filler) {
 	DFILE *cur=NULL;
 	printf("FILL DIR R pre PATH: %s\n",path);
-	
+	int movement=-1;
 	if(strcmp(path, loaded_struct_path) == 0)
 	{
 		//moze pokracovat dalej
+		cur = find_file(loaded_struct_path);
+		cur=cur->first_child;
+		
 	}
 	else
 	{
+
+		char *current_url;
+		char *copy_path;
+		char *orig_path;
+		copy_path = strdup(path);
+		orig_path = strdup(path);
+		current_url = create_url(copy_path);
+	
+		//dealloc_DFILE(root);
+		printf("CALLING PARSER\n");
+		if(strlen(path) > strlen(loaded_struct_path))
+		{ //hybem sa smerom dovnutra stromu
+			movement=1;
+		}
+		else
+		{ //hybem sa von zo stromu
+			movement=0;
+		}
+		printf("ORIG PATH: %s, COPY PATH: %s\n", orig_path, copy_path);
+		call_parser(current_url, orig_path, movement);
 		if(loaded_struct_path != NULL)
 		{
 			free(loaded_struct_path);
 		}
 		loaded_struct_path = strdup(path);
-		char *current_url;
-		char *copy_path = strdup(path);
-		current_url = create_url(copy_path);
-		printf("CALLING DEALLOC\n");
-		dealloc_DFILE(root);
-		printf("CALLING PARSER\n");
-		call_parser(current_url);
+		cur = find_file (loaded_struct_path);
+		cur = cur->first_child;
 		printf("PRVY FREE\n");
 		free(current_url);
 		printf("DRUHY FREE\n");
 		free(copy_path);
+		free(orig_path);
 	}
 	
 	
 	//najdeme si spravny directory
-	cur=root->first_child;
+	
 	char found = FALSE;
 	printf("IDEM VYPISOVAT PRINTDIRS\n");
 	print_dirs(buffer,filler,cur);
@@ -605,23 +645,17 @@ char *get_root_name(char *url)
 }
 
 
-void call_parser(char *url)
+void call_parser(char *url, char *path, int movement)
 {
 	static char first_init = TRUE;
 	char *filename = "mypy3"; //meno pythonackeho modulu na import
 	PyObject *sName, *sModule, *sFunc, *sValue, *sArgs,*sUrl, *sMode;   //NEJAKE PYTHON OBJEKTY 
 	PyObject *sLong;
 	long int d=4;
+	DFILE *cur_node=NULL;
 	 //v roote zacina cela ta struktura suborov
 	 //inicializovanie rootu typu DFILE
-		root=(DFILE*)malloc(sizeof(DFILE));
-		root->isdir=1;
-		root->name = get_root_name(url);
-		printf("ROOT NAME JE %s \n", root->name);
-		root->size=0;
-		root->parent = NULL;
-		root->next_sibling = NULL;
-		root->first_child=NULL;
+		
 	
 	if(first_init)
 	{
@@ -630,14 +664,42 @@ void call_parser(char *url)
 		PyRun_SimpleString(   //takto do syspATH PRIdame dalsie cesty
 			"import sys\n"
 			"sys.path.append('/home/pi/Documents/C/matko')\n"
-			"sys.path.append('/home/matko/Desktop/cuddly-fs')\n"
+			"sys.path.append('/home/matko/Desktop/cuddly-fs/ver/21.4.17')\n"
 		);
 		first_init = FALSE;
 		loaded_struct_path = strdup("/");
+		if(root == NULL) {
+		root=(DFILE*)malloc(sizeof(DFILE));
+		root->isdir=1;
+		root->name = get_root_name(url);
+		printf("ROOT NAME JE %s \n", root->name);
+		root->size=0;
+		root->parent = NULL;
+		root->next_sibling = NULL;
+		root->first_child=NULL;
+		}
+		else 
+		{
+		 
+		}
+		movement=-1;
+		
+	}
+	cur_node = root;
+	if(movement == 1 || movement == 0)
+	{ //movement == 1 znamena ide sa hlbsie,
+		// movement == 0 znamena ide sa plytsie, ked sa ide plytsie, treba dealokovat vsetky deti
+		printf("POSLANA PATH : %s \n", path);
+		cur_node = find_file(path);
+		printf("Najdeny node s menom: %s pre path %s a path_len %d \n", cur_node->name);
+		//TODO: treba naimplementovat vyfreeovanie celej stromovej struktury az na root node	
+			dealloc_DFILE(cur_node); //dealokuje vsetky deti
+			printf("Po dealokovani\n");
+		
 	}
 	
 	int kind = PyUnicode_1BYTE_KIND; //tu nastavime 1bajtovy unicode
-	sName=PyUnicode_FromKindAndData(kind, filename, (Py_ssize_t) 5); //V TOM JE UNICODE NAZOV SKRIPTU, ABY HO MOHOL NAIMPORTOVAT A POTOM SA BUDE DALEJ SPUSTAT
+	sName=PyUnicode_FromKindAndData(kind, filename, (Py_ssize_t) strlen(filename)); //V TOM JE UNICODE NAZOV SKRIPTU, ABY HO MOHOL NAIMPORTOVAT A POTOM SA BUDE DALEJ SPUSTAT
 	sModule = PyImport_Import(sName); //to co importujeme - ten modul, PYoBJECT
 	Py_DECREF(sName);  //DECREF A INCREF - python pocita referencie aby vedel kedy spustit garbage collector, ma counter na referencie, ak je counter na 0, s premennou sa uz nic nerobi, a vtedy vola garbage collector, v pythone to robit netreba,ale v C API to musime robit manualne, ked vieme ze uz nepotrebujeme sName premennu, povieme mu to, je to velmi podobne ako free v Ccku
 	
@@ -646,7 +708,7 @@ void call_parser(char *url)
 	sMode = PyUnicode_FromKindAndData(kind, mode, (Py_ssize_t) sizeof(char));
 	
 	sArgs = PyTuple_Pack(2, sUrl, sMode);
-	
+	printf("PRED PYTHON FUNKCIOU \n");
 	if (sModule != NULL) //tak sa nam podarilo naimportovat
 	{
 		sFunc = PyObject_GetAttrString(sModule, "main");
@@ -684,14 +746,15 @@ void call_parser(char *url)
 
 	
 	PyObject *files = PyDict_GetItemString(sValue, "files"); //v sValue je root a je tam teda cela sttruktura pod klucom files
-	int dirs_count=1;
+	int dirs_count=dir_index+1;
 	printf("PRED ITERACIOU \n");
-	iterate_dict(files,root,&dirs_count);
+	//iterate_dict(files,root,&dirs_count);
+	iterate_dict(files,cur_node,&dirs_count);
 	printf("---- ZACINAM VYPISOVANIE V C ----\n");
 	//allocate dirs char array
-	dirs=(char**)malloc(dirs_count * sizeof(char*)); //pole stringov na vypis
-	dirs[dir_index]=strdup("/");
-	dir_index++;
+	//dirs=(char**)malloc(dirs_count * sizeof(char*)); //pole stringov na vypis
+	//dirs[dir_index]=strdup("/");
+	//dir_index++;
 	//for(i=0;i<dirs_count;i++) dirs[i]=
 	char *curdir=malloc(2*sizeof(char));
 	curdir[0]='\0';
@@ -729,7 +792,7 @@ int main(int argc, char *argv[]) {
 		parse_command_line_args(argv[k]);
 	}
 	
-	call_parser(base_url);
+	call_parser(base_url, "/", 1);
 	
 	//int argc;
 	//wchar_t * argv[3];
@@ -850,7 +913,7 @@ void iterate_dict(PyObject *sValue, DFILE *root,int *dirs_count) { //v iterate d
 	PyObject *key, *value;
 	Py_ssize_t pos = 0;
 	
-	DFILE* cur;
+	DFILE* cur=NULL;
 	while(PyDict_Next(sValue, &pos, &key, &value))
 	{
 		if(root->first_child == NULL)
@@ -863,6 +926,7 @@ void iterate_dict(PyObject *sValue, DFILE *root,int *dirs_count) { //v iterate d
 		}
 		else
 		{
+			if(cur == NULL) cur = root->first_child;
 			cur->next_sibling = (DFILE*)malloc(sizeof(DFILE));
 			cur = cur->next_sibling;
 			cur->next_sibling=NULL;
@@ -933,7 +997,7 @@ void print_fs(DFILE *root, int depth, char *current_dir)
 		for(i=0;i<depth;i++) printf("\t");
 		if(cur->isdir)
 		{
-			//printf("%s/\n",cur->name);
+			printf("%s/\n",cur->name);
 			int alloc_size = strlen(current_dir) + strlen(cur->name) + 2;
 			next_dir=(char*)malloc(alloc_size*sizeof(char));
 			next_dir[0]='\0';
@@ -941,14 +1005,14 @@ void print_fs(DFILE *root, int depth, char *current_dir)
 			strcat(next_dir,current_dir);
 			strcat(next_dir,"/");
 			strcat(next_dir,cur->name);
-			dirs[dir_index]=next_dir;
-			dir_index++;
+		//	dirs[dir_index]=next_dir;
+		//	dir_index++;
 			print_fs(cur,depth+1,next_dir);
 			
 		}
 		else
 		{
-			//printf("%s\n",cur->name);
+			printf("%s\n",cur->name);
 		}
 		//printf("Pre %s :\n date:%s, time: %s, size:%ld \n", cur->name,cur->date, cur->time, cur->size );
 		time_t cas = get_atime(cur->date, cur->time);
