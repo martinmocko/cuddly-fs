@@ -361,6 +361,7 @@ DFILE *find_file(char *path)	 {
 	//tuto vzdy bude treba posielat konvertovane path z const char * na char*
 	//cize asi sa to bude riesit cez strdup, treba si davat pozor na to ze treba
 	//dealokovat pointre
+	
 	if(strcmp(path, "/") == 0 )
 	{ return root; }
 	DFILE *cur=root->first_child;
@@ -369,10 +370,10 @@ DFILE *find_file(char *path)	 {
 	char *token;
 	char *temp_path = strdup(path);
 	/* get the first token */
-	token = strtok(path, s);
+	token = strtok(temp_path, s);
 	/* walk through other tokens */
-	printf("Volany find_file s path: %s\n", temp_path);
-	free(temp_path);
+	printf("Volany find_file s path: %s\n", path);
+	
 	
 	while( token != NULL ) 
 	{
@@ -411,6 +412,8 @@ DFILE *find_file(char *path)	 {
 			break;
 		}
 	}
+	free(temp_path);
+	
 	return cur;
 }
 
@@ -482,7 +485,7 @@ void dealloc_DFILE(DFILE* node)
 		child=next;
 	}
 	node->first_child = NULL;
-	/*
+	
 	if(node != root) {
 	DFILE* sibling=node->parent->first_child;
 	node->parent->first_child=node;
@@ -501,7 +504,7 @@ void dealloc_DFILE(DFILE* node)
 	}
 	node->next_sibling=NULL;
 	}
-*/
+
 }
 
 void fill_dir_R(const char *path, void *buffer, fuse_fill_dir_t filler) {
@@ -509,7 +512,8 @@ void fill_dir_R(const char *path, void *buffer, fuse_fill_dir_t filler) {
 	printf("FILL DIR R pre PATH: %s\n",path);
 	int movement=-1;
 	if(strcmp(path, loaded_struct_path) == 0)
-	{
+	{	printf("++NEMUSIM LOADOVAT++\n"); 
+		printf("LOADED: %s , PATH: %s .. SU TO ISTE\n", loaded_struct_path, path);
 		//moze pokracovat dalej
 		cur = find_file(loaded_struct_path);
 		cur=cur->first_child;
@@ -517,7 +521,8 @@ void fill_dir_R(const char *path, void *buffer, fuse_fill_dir_t filler) {
 	}
 	else
 	{
-
+		printf("++MUSIM LOADOVAT++\n"); 
+		printf("LOADED: %s , PATH: %s\n", loaded_struct_path, path);
 		char *current_url;
 		char *copy_path;
 		char *orig_path;
@@ -540,9 +545,13 @@ void fill_dir_R(const char *path, void *buffer, fuse_fill_dir_t filler) {
 		if(loaded_struct_path != NULL)
 		{
 			free(loaded_struct_path);
+			loaded_struct_path = NULL;
 		}
 		loaded_struct_path = strdup(path);
-		cur = find_file (loaded_struct_path);
+		printf("NOVA LOADED_ST_P: %s\n", loaded_struct_path);
+		char *temp_find = strdup(loaded_struct_path);
+		cur = find_file (temp_find);
+		free(temp_find);
 		cur = cur->first_child;
 		printf("PRVY FREE\n");
 		free(current_url);
@@ -813,7 +822,7 @@ int call_parser(char *url, char *path, int movement)
 		PyRun_SimpleString(   //takto do syspATH PRIdame dalsie cesty
 			"import sys\n"
 			"sys.path.append('/home/pi/Documents/C/matko/najnovsie')\n"
-			"sys.path.append('/home/matko/Desktop/cuddly-fs/ver/21.4.17')\n"
+			"sys.path.append('/home/matko/Desktop/cuddly-fs/ver/4.5.17')\n"
 		);
 		first_init = FALSE;
 		loaded_struct_path = strdup("/");
@@ -967,107 +976,6 @@ int main(int argc, char *argv[]) {
 	//argc=2;
 	//argv[0]=L"mypy.py";
 	//argv[1]=L"http://broskini.xf.cz/folder1";
-	
-	
-	/*
-	char *filename = "mypy3"; //meno pythonackeho modulu na import
-	PyObject *sName, *sModule, *sFunc, *sValue, *sArgs,*sUrl, *sMode;   //NEJAKE PYTHON OBJEKTY 
-	PyObject *sLong;
-	long int d=4;
-	root=(DFILE*)malloc(sizeof(DFILE)); //v roote zacina cela ta struktura suborov
-	
-	Py_Initialize(); //inicializacia python interpretera
-	
-	sLong=PyLong_FromLong(d);
-	
-	PyRun_SimpleString(   //takto do syspATH PRIdame dalsie cesty
-		"import sys\n"
-		"sys.path.append('/home/pi/Documents/C/matko')\n"
-		"sys.path.append('/home/matko/Desktop/cuddly-fs')\n"
-	);
-	
-	int kind = PyUnicode_1BYTE_KIND; //tu nastavime 1bajtovy unicode
-	sName=PyUnicode_FromKindAndData(kind, filename, (Py_ssize_t) 5); //V TOM JE UNICODE NAZOV SKRIPTU, ABY HO MOHOL NAIMPORTOVAT A POTOM SA BUDE DALEJ SPUSTAT
-	sModule = PyImport_Import(sName); //to co importujeme - ten modul, PYoBJECT
-	Py_DECREF(sName);  //DECREF A INCREF - python pocita referencie aby vedel kedy spustit garbage collector, ma counter na referencie, ak je counter na 0, s premennou sa uz nic nerobi, a vtedy vola garbage collector, v pythone to robit netreba,ale v C API to musime robit manualne, ked vieme ze uz nepotrebujeme sName premennu, povieme mu to, je to velmi podobne ako free v Ccku
-	
-	//spravime python unicode string z URL stringu
-	char *url = "http://broskini.xf.cz/folder1";
-	sUrl = PyUnicode_FromKindAndData(kind, url, (Py_ssize_t) strlen(url));
-	sMode = PyUnicode_FromKindAndData(kind, mode, (Py_ssize_t) sizeof(char));
-	
-	sArgs = PyTuple_Pack(2, sUrl, sMode);
-	
-	if (sModule != NULL) //tak sa nam podarilo naimportovat
-	{
-		sFunc = PyObject_GetAttrString(sModule, "main");
-		if (sFunc && PyCallable_Check(sFunc)) //sFunc je objekt main pythonovskej funkcie
-		{
-			sValue = PyObject_CallObject(sFunc, sArgs); //navratova hodnota mainu - ten root - je v sVALUE
-														//tu sa vola python funkcia
-		}
-		else
-		{
-			printf("SFUNC AND CHYBA!!\n");
-		}
-		if (sValue != NULL)
-		{
-			printf("PYTHON FUNKCIA VRATILA OBJEKT!!!!!!\n");
-		}
-		else
-		{
-			printf("NIC MI SEM NEPRISLO!!!!\n");
-		}
-		
-	}
-	else  //nepodarilo sa naimportovat
-	{
-		printf("SMODULE JE NULL!!!\n");
-	}
-	
-	long dict_check = PyDict_CheckExact(sValue);
-	if( dict_check == 0)
-	{
-		printf("Vrateny python objekt nie je dict, koncim program..\n");
-		return 1;
-	}
-	printf("Velkost dictu je %d\n", PyDict_Size(sValue));
-	
-	
-	//inicializovanie rootu typu DFILE
-	root->isdir=1;
-	root->name = "root";
-	root->size=0;
-	root->parent = NULL;
-	root->next_sibling = NULL;
-	root->first_child=NULL;
-	
-	PyObject *files = PyDict_GetItemString(sValue, "files"); //v sValue je root a je tam teda cela sttruktura pod klucom files
-	int dirs_count=1;
-	printf("pred iterate \n");
-	iterate_dict(files,root,&dirs_count);
-	printf("---- ZACINAM VYPISOVANIE V C ----\n");
-	//allocate dirs char array
-	dirs=(char**)malloc(dirs_count * sizeof(char*)); //pole stringov na vypis
-	dirs[dir_index]=strdup("/");
-	dir_index++;
-	//for(i=0;i<dirs_count;i++) dirs[i]=
-	char *curdir=malloc(2*sizeof(char));
-	curdir[0]='\0';
-	//strcat(curdir,"/");
-	print_fs(root,0,curdir);
-	//printf("----- VYPIS DIRS -------\n");
-	//for(i=0;i<dirs_count;i++) printf("%s\n", dirs[i]);
-	Py_DECREF(sLong);
-	Py_DECREF(files);
-	Py_DECREF(sValue);
-	Py_DECREF(sModule);
-	
-	if(strcmp(mode, "T") == 0)
-	{
-		Py_Finalize();
-	}
-	*/
 		
 	return fuse_main(argc, argv, &operations, NULL);
 	
