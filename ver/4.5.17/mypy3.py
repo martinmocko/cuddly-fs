@@ -11,14 +11,40 @@ import dateutil.parser as dparser
 
 http_status_errors = 0
 
+def get_file_size(size):
+    word=size
+    if size.find('K') != -1:
+        word = re.sub('K','',word)
+        word = float(word)
+        word = word*1024
+        word += 1024
+        word = repr(word)
+    elif size.find('M') != -1:
+        word = re.sub('M','',word)
+        word = float(word)
+        word = word*1024*1024
+        word += 1024*1024
+        word = repr(word)
+    elif size.find('G') != -1:
+        word = re.sub('G','',word)
+        word = float(word)
+        word = word*1024*1024*1024
+        word += 1024*1024*1024
+        word = repr(word)
+    return word
+            
+
 def current_folder_print(node):
     for key,value in node.items():  #pre vsetky subory v aktualnom priecinku
        print ("Nazov:" + key + " datum:" + node[key]["date"] + " cas:" + node[key]["time"] + " velkost:" + node[key]["size"] + " directory: " + str(node[key]["isdir"]))
 
-def apache(table):
+def apache(table,input_url):
     tr_tags = table.findAll("tr")
     counter=0
     root={}
+    if input_url.endswith('/') == False:
+        input_url += '/'
+        
     for tag in tr_tags:
         counter+=1
         if(counter == 1 or counter ==2 or counter == 3):
@@ -56,15 +82,23 @@ def apache(table):
                 
             elif td_counter == 4:
                 #velkost
+                if root[name]["isdir"] == 1:
+                    root[name]["size"]="-"
+                    continue
+                #file_url = input_url + name
+                #print ("REQUESTUJEM TUTO URL " + file_url)
+                #rq = requests.get(file_url,stream=True)
+                #root[name]["size"]=rq.headers['Content-length']
+                #rq.close()
                 size = td.get_text()
                 size = size.strip()
-                root[name]["size"]=size
+                root[name]["size"]=get_file_size(size)
                 
-    current_folder_print(root)
+    #current_folder_print(root)
                 
     return root
 
-def nginx(pre):
+def nginx(pre,input_url):
     s = pre.get_text() #textova podoba obsahu pre tagu
     s = re.sub('  +', ' ', s) #squeeznu sa viacere medzery na jednu
     s = s[s.find('\n')+1:] #nejake odriadkovanie?..prvy riadok boli hovadiny
@@ -87,16 +121,16 @@ def nginx(pre):
         elif cnt % 4 == 3:
             root[name]["time"]=word
         elif cnt % 4 == 0:
-            if word.find('K') != -1:
-                #print("obsahuje Kcko")
-                word = re.sub('K','',word)
-                word = float(word)
-                word = word*1024
-                word = repr(word)
-                root[name]["size"]=word
-            else:
-                root[name]["size"]=word
-    
+            if root[name]["isdir"] == 1:
+                root[name]["size"]="-"
+                continue
+            #file_url = input_url + name
+            #print ("REQUESTUJEM TUTO URL " + file_url)
+            #rq = requests.get(file_url,stream=True)
+            #root[name]["size"]=rq.headers['Content-length']
+            #rq.close()
+            size = word.strip()
+            root[name]["size"]=get_file_size(size)
     
     return root
 
@@ -110,11 +144,11 @@ def get_dir_files(input_url):
     pre = soup.find("pre") #v pre tagu su linky
     if pre != None:
         print ("********************** PRE TAG **********************")
-        return nginx(pre)
+        return nginx(pre,input_url)
     table = soup.find("table")
     if table != None:
         print ("********************** TABLE TAG **********************")
-        return apache(table)
+        return apache(table,input_url)
         
     
  

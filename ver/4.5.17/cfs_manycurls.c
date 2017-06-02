@@ -77,11 +77,9 @@ typedef int (*fuse_fill_dir_t) (void *buf, const char *name, const struct stat *
 DFILE *root = (DFILE*)NULL;
 char **dirs=NULL;
 int dir_index=0;
-char *mode = NULL;
+char *mode;
 char *loaded_struct_path=NULL;
-char *base_url = NULL;
-char *current_read_file = NULL;
-char *current_read_file_content = NULL;
+char *base_url;
 
 
 
@@ -673,6 +671,7 @@ struct string get_file_content(const char *path) {
 		res = curl_easy_perform(curl);
 		printf("GFC-PO PERFORM");
 		str.code = res; 
+		printf("CURL KOD %d\n", res);
 		}	
 	curl_easy_cleanup(curl);
 	printf("GFC-PO CLEANUP\n");
@@ -689,53 +688,15 @@ static int fsread(const char *path, char *buffer, size_t size, off_t offset, str
 	
 	if(find_file(strdup(path))){
 		printf("(FSREAD) NAJDENY FILE\n");
-		if(current_read_file != NULL && strcmp(current_read_file, path) == 0) {
-			printf("CITAM Z NALOADOVANEHO SUBORU (NO CURL)\n");
-			int real_size = strlen(current_read_file_content);
-			if(offset+size<=real_size) {
-				memcpy(buffer, current_read_file_content + offset, size);
-				return size;
-			}
-			else {
-				int blocksize = real_size - offset;
-				memcpy(buffer, current_read_file_content + offset, blocksize);
-				return blocksize;
-			}
-		}
-		else {
-		//musime subor nacitat pomocou curlu a potom dame potrebnu cast do buffra
-		printf("MUSIM NALOADOVAT SUBOR (CURL)\n");
-		if(current_read_file != NULL ) {
-			free(current_read_file);
-			current_read_file = NULL;
-		}
-		if (current_read_file_content != NULL) {
-			free(current_read_file_content);
-			current_read_file_content = NULL;
-		}
 		struct string filecontent = get_file_content(path);	
 		printf("DOSTAL SOM FILE CONTENT\n");
 		if(filecontent.code != CURLE_OK) {
 			printf("(FSREAD) NENI TO CURLEOK\n");
 			return -EIO;
 		}
-		current_read_file = strdup(path);
-		current_read_file_content = filecontent.ptr;
-		int real_size = strlen(current_read_file_content);
-		if(offset+size<=real_size) {
-			memcpy(buffer, current_read_file_content + offset, size);
-			return size;
-		}
-		else {
-			int blocksize = real_size - offset;
-			memcpy(buffer, current_read_file_content + offset, blocksize);
-			return blocksize;
-		}
+		out = filecontent.ptr;
 		
 		}
-		
-		}
-		
 	else { 
 		printf("(FSREAD) NENAJDENY FILE\n");
 		return -ENOENT; }
